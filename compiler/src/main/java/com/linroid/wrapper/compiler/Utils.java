@@ -9,14 +9,12 @@ import java.util.List;
 class Utils {
     public static String implode(String separator, List<String> data) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < data.size() - 1; i++) {
-            //data.length - 1 => to not add separator at the end
-            if (!data.get(i).matches(" *")) {//empty string are ""; " "; "  "; and so on
-                sb.append(data.get(i));
+        for (int i = 0; i < data.size(); i++) {
+            if (sb.length() > 0) {
                 sb.append(separator);
             }
+            sb.append(data.get(i));
         }
-        sb.append(data.get(data.size() - 1).trim());
         return sb.toString();
     }
 }

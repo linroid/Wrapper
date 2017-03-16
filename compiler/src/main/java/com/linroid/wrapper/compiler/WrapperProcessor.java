@@ -2,15 +2,20 @@ package com.linroid.wrapper.compiler;
 
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
+import com.linroid.wrapper.annotations.Multiple;
 import com.linroid.wrapper.annotations.WrapperClass;
+import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -41,16 +46,20 @@ import javax.tools.Diagnostic;
 @AutoService(Processor.class)
 public class WrapperProcessor extends AbstractProcessor {
     public static final String FIELD_DELEGATE = "_delegate";
+    public static final String FIELD_MULTI_DELEGATE = "_delegates";
     public static final String FIELD_HANDLER = "_handler";
-    public static final String METHOD_SETTER = "set";
-    public static final String METHOD_GETTER = "get";
-    public static final String HANDLER_CLASS_NAME = "android.os.Handler";
-    public static final String LOOPER_CLASS_NAME = "android.os.Looper";
+    public static final String METHOD_SETTER = "setWrapper";
+    public static final String METHOD_GETTER = "getWrapper";
+    public static final String METHOD_ADDER = "addWrapper";
+    public static final String METHOD_REMOVER = "removeWrapper";
+
+    public static final ClassName HANDLER_CLASS_NAME = ClassName.get("android.os", "Handler");
+    public static final ClassName LOOPER_CLASS_NAME = ClassName.get("android.os", "Looper");
+    public static final ClassName HASH_SET_CLASS_NAME = ClassName.get(HashSet.class);
     private Messager logger;
     private Types typeUtils;
     private Elements elementUtils;
     private Filer filer;
-    private TypeMirror handlerType;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -59,20 +68,21 @@ public class WrapperProcessor extends AbstractProcessor {
         typeUtils = processingEnv.getTypeUtils();
         elementUtils = processingEnv.getElementUtils();
         filer = processingEnv.getFiler();
-        handlerType = elementUtils.getTypeElement(HANDLER_CLASS_NAME).asType();
     }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
-        System.out.println("start process...");
+        logger.printMessage(Diagnostic.Kind.NOTE, "start process wrapper annotations...");
         for (Element element : env.getElementsAnnotatedWith(WrapperClass.class)) {
             if (!SuperficialValidation.validateElement(element)) continue;
             try {
-                System.out.println("found: " + element.toString());
-                if (element.getKind() == ElementKind.INTERFACE) {
-                    processInterface(element);
-                } else {
-                    processClass(element);
+                logger.printMessage(Diagnostic.Kind.NOTE, "found: " + element.toString());
+                boolean isInterface = element.getKind() == ElementKind.INTERFACE;
+
+                process(element, isInterface, false);
+                boolean isMultiple = element.getAnnotation(Multiple.class) != null;
+                if (isMultiple) {
+                    process(element, isInterface, true);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -81,20 +91,15 @@ public class WrapperProcessor extends AbstractProcessor {
         return false;
     }
 
-    private void processClass(Element element) {
-        logger.printMessage(Diagnostic.Kind.NOTE, "a class: " + element.getSimpleName());
-    }
-
-    private void processInterface(Element element) {
+    private void process(Element element, boolean isInterface, boolean isMultiple) {
         TypeElement typeElement = (TypeElement) element;
-        String wrapperClassName = typeElement.getSimpleName().toString() + "Wrapper";
+
         String qualifyName = typeElement.getQualifiedName().toString();
         String packageName = qualifyName.substring(0, qualifyName.lastIndexOf('.'));
         boolean isAllUiThread = isAnnotatedUiThread(typeElement);
         boolean hasUiThread = isAllUiThread;
         TypeName delegateType = TypeName.get(typeElement.asType());
-        logger.printMessage(Diagnostic.Kind.NOTE, "a interface: " + typeElement.getSimpleName());
-        TypeSpec.Builder typeBuilder = createNewWrapper(wrapperClassName, delegateType);
+        TypeSpec.Builder typeBuilder = createNewWrapper(typeElement, delegateType, isInterface, isMultiple);
         for (Element e : typeElement.getEnclosedElements()) { // iterate over children
             if (e.getKind() == ElementKind.METHOD) {
                 boolean isMethodUiThread = isAllUiThread;
@@ -107,31 +112,35 @@ public class WrapperProcessor extends AbstractProcessor {
                 if (isMethodUiThread) {
                     hasUiThread = true;
                 }
-                typeBuilder.addMethod(createDelegateMethod(methodElement, true, isMethodUiThread));
+                typeBuilder.addMethod(createDelegateMethod(typeElement, methodElement, isInterface, isMethodUiThread, isMultiple));
             }
         }
         if (hasUiThread) {
-            typeBuilder.addField(TypeName.get(handlerType), FIELD_HANDLER, Modifier.PRIVATE);
+            typeBuilder.addField(HANDLER_CLASS_NAME, FIELD_HANDLER, Modifier.PRIVATE);
         }
         MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder()
-                .addModifiers(Modifier.PUBLIC)
-                .addParameter(delegateType, FIELD_DELEGATE)
-                .addStatement("this.$N = $N", FIELD_DELEGATE, FIELD_DELEGATE);
+                .addModifiers(Modifier.PUBLIC);
+        if (!isMultiple) {
+            constructorBuilder.addParameter(delegateType, FIELD_DELEGATE)
+                    .addStatement("this.$N = $N", FIELD_DELEGATE, FIELD_DELEGATE);
+        }
         if (hasUiThread) {
-            constructorBuilder.addStatement("this.$N = new $N($N.getMainLooper())", FIELD_HANDLER, HANDLER_CLASS_NAME, LOOPER_CLASS_NAME);
+            constructorBuilder.addStatement("this.$N = new $T($T.getMainLooper())", FIELD_HANDLER, HANDLER_CLASS_NAME, LOOPER_CLASS_NAME);
         }
         typeBuilder.addMethod(constructorBuilder.build());
         if (hasUiThread) {
             MethodSpec.Builder secondConstructorBuilder = MethodSpec.constructorBuilder()
                     .addModifiers(Modifier.PUBLIC)
-                    .addParameter(delegateType, FIELD_DELEGATE)
-                    .addParameter(TypeName.get(handlerType), FIELD_HANDLER)
-                    .addStatement("this.$N = $N", FIELD_DELEGATE, FIELD_DELEGATE)
+                    .addParameter(HANDLER_CLASS_NAME, FIELD_HANDLER)
                     .addStatement("this.$N = $N", FIELD_HANDLER, FIELD_HANDLER);
+            if (!isMultiple) {
+                secondConstructorBuilder.addParameter(delegateType, FIELD_DELEGATE)
+                        .addStatement("this.$N = $N", FIELD_DELEGATE, FIELD_DELEGATE);
+            }
             typeBuilder.addMethod(secondConstructorBuilder.build());
         }
         if (hasUiThread) {
-            constructorBuilder.addStatement("this.$N = new $N($N.getMainLooper())", FIELD_HANDLER, HANDLER_CLASS_NAME, LOOPER_CLASS_NAME);
+            constructorBuilder.addStatement("this.$N = new $T($T.getMainLooper())", FIELD_HANDLER, HANDLER_CLASS_NAME, LOOPER_CLASS_NAME);
         }
 
         JavaFile javaFile = JavaFile.builder(packageName, typeBuilder.build())
@@ -145,7 +154,7 @@ public class WrapperProcessor extends AbstractProcessor {
 
     }
 
-    private MethodSpec createDelegateMethod(ExecutableElement methodElement, boolean isInterface, boolean isUiThread) {
+    private MethodSpec createDelegateMethod(TypeElement element, ExecutableElement methodElement, boolean isInterface, boolean isUiThread, boolean isMultiple) {
         String methodName = methodElement.getSimpleName().toString();
         MethodSpec.Builder methodBuilder;
         methodBuilder = MethodSpec.methodBuilder(methodName);
@@ -153,9 +162,9 @@ public class WrapperProcessor extends AbstractProcessor {
             methodBuilder.addAnnotation(Override.class);
         }
         boolean hasReturnType = methodElement.getReturnType().getKind() != TypeKind.VOID;
-        if (isUiThread && hasReturnType) {
-            throw new IllegalArgumentException(methodName + " with annotated UiThread shouldn't has a return type");
-        }
+//        if (isUiThread && hasReturnType) {
+//            throw new IllegalArgumentException(methodName + " with annotated UiThread shouldn't has a return type");
+//        }
 
         if (hasReturnType) {
             methodBuilder.returns(TypeName.get(methodElement.getReturnType()));
@@ -169,26 +178,41 @@ public class WrapperProcessor extends AbstractProcessor {
             methodBuilder.addParameter(TypeName.get(param.asType()), param.getSimpleName().toString(), Modifier.FINAL);
             argNames.add(param.getSimpleName().toString());
         }
-        methodBuilder.beginControlFlow("if(this.$N != null)", FIELD_DELEGATE);
         if (isUiThread) {
-            methodBuilder.beginControlFlow("if($N.myLooper() == null || $N.myLooper() != $N.getMainLooper())", LOOPER_CLASS_NAME, LOOPER_CLASS_NAME, LOOPER_CLASS_NAME);
-            methodBuilder.addCode("$N.post(new Runnable(){\n\t@Override public void run() {\n", FIELD_HANDLER);
-            methodBuilder.beginControlFlow("if($N != null)", FIELD_DELEGATE);
-        }
-        methodBuilder.addStatement("$N $N.$N($N)", hasReturnType ? "return" : "", FIELD_DELEGATE, methodName, Utils.implode(", ", argNames));
-        if (isUiThread) {
+            MethodSpec.Builder runMethodBuilder = MethodSpec.methodBuilder("run")
+                    .addAnnotation(Override.class)
+                    .addModifiers(Modifier.PUBLIC);
+            invokeMethod(element, runMethodBuilder, methodName, argNames, isMultiple, isUiThread, hasReturnType);
+            TypeSpec runnable = TypeSpec.anonymousClassBuilder("")
+                    .addSuperinterface(Runnable.class)
+                    .addMethod(runMethodBuilder.build())
+                    .build();
+            methodBuilder.beginControlFlow("if($T.myLooper() == null || $T.myLooper() != $T.getMainLooper())", LOOPER_CLASS_NAME, LOOPER_CLASS_NAME, LOOPER_CLASS_NAME);
+            methodBuilder.addStatement("$N.post($L)", FIELD_HANDLER, runnable);
             methodBuilder.endControlFlow();
-            methodBuilder.endControlFlow();
-            methodBuilder.addCode("\n});\n}");
             methodBuilder.beginControlFlow("else");
-            methodBuilder.addStatement("$N this.$N.$N($N)", hasReturnType ? "return" : "", FIELD_DELEGATE, methodName, Utils.implode(", ", argNames));
+        }
+        invokeMethod(element, methodBuilder, methodName, argNames, isMultiple, isUiThread, hasReturnType);
+        if (isUiThread) {
             methodBuilder.endControlFlow();
         }
-        methodBuilder.endControlFlow();
+
         if (hasReturnType) {
             methodBuilder.addStatement("return $N", defaultValue(methodElement.getReturnType()));
         }
         return methodBuilder.build();
+    }
+
+    private static void invokeMethod(TypeElement element, MethodSpec.Builder methodBuilder, String methodName, List<String> argNames, boolean isMultiple, boolean isUiThread, boolean hasReturnType) {
+        if (isMultiple) {
+            methodBuilder.beginControlFlow("for(final $T $N : $N)", TypeName.get(element.asType()), FIELD_DELEGATE, FIELD_MULTI_DELEGATE);
+        }
+        methodBuilder.beginControlFlow("if($N != null)", FIELD_DELEGATE);
+        methodBuilder.addStatement("$N $N.$N($N)", (hasReturnType && !isMultiple && !isUiThread) ? "return" : "", FIELD_DELEGATE, methodName, Utils.implode(", ", argNames));
+        methodBuilder.endControlFlow();
+        if (isMultiple) {
+            methodBuilder.endControlFlow();
+        }
     }
 
     private boolean isAnnotatedUiThread(Element element) {
@@ -217,24 +241,56 @@ public class WrapperProcessor extends AbstractProcessor {
         return "null";
     }
 
-    private TypeSpec.Builder createNewWrapper(String wrapperClassName, TypeName delegateType) {
-        MethodSpec setter = MethodSpec.methodBuilder(METHOD_SETTER)
-                .addModifiers(Modifier.PUBLIC)
-                .addParameter(delegateType, FIELD_DELEGATE)
-                .addStatement("this.$N = $N", FIELD_DELEGATE, FIELD_DELEGATE)
-                .build();
-        MethodSpec getter = MethodSpec.methodBuilder(METHOD_GETTER)
-                .addModifiers(Modifier.PUBLIC)
-                .returns(delegateType)
-                .addStatement("return this.$N", FIELD_DELEGATE)
-                .build();
+    private TypeSpec.Builder createNewWrapper(TypeElement element, TypeName delegateType, boolean isInterface, boolean isMultiple) {
 
-        return TypeSpec.classBuilder(wrapperClassName)
-                .addSuperinterface(delegateType)
-                .addMethod(setter)
-                .addMethod(getter)
-                .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                .addField(delegateType, FIELD_DELEGATE, Modifier.PRIVATE);
+        String wrapperClassName;
+        if (isMultiple) {
+            wrapperClassName = element.getSimpleName().toString() + "MultiWrapper";
+        } else {
+            wrapperClassName = element.getSimpleName().toString() + "Wrapper";
+        }
+
+
+        TypeSpec.Builder builder = TypeSpec.classBuilder(wrapperClassName)
+                .addModifiers(Modifier.PUBLIC, Modifier.FINAL);
+        if (isInterface) {
+            builder.addSuperinterface(delegateType);
+        }
+        if (isMultiple) {
+            MethodSpec adder = MethodSpec.methodBuilder(METHOD_ADDER)
+                    .addModifiers(Modifier.PUBLIC)
+                    .addParameter(delegateType, FIELD_DELEGATE)
+                    .addStatement("this.$N.add($N)", FIELD_MULTI_DELEGATE, FIELD_DELEGATE)
+                    .build();
+            MethodSpec remover = MethodSpec.methodBuilder(METHOD_REMOVER)
+                    .addModifiers(Modifier.PUBLIC)
+                    .addParameter(delegateType, FIELD_DELEGATE)
+                    .addStatement("this.$N.remove($N)", FIELD_MULTI_DELEGATE, FIELD_DELEGATE)
+                    .build();
+            TypeName hashSetType = ParameterizedTypeName.get(HASH_SET_CLASS_NAME, delegateType);
+            FieldSpec holders = FieldSpec.builder(hashSetType, FIELD_MULTI_DELEGATE, Modifier.PRIVATE)
+                    .initializer("new $T<>()", HASH_SET_CLASS_NAME)
+                    .build();
+            builder.addMethod(adder)
+                    .addMethod(remover)
+                    .addField(holders);
+        } else {
+            MethodSpec setter = MethodSpec.methodBuilder(METHOD_SETTER)
+                    .addModifiers(Modifier.PUBLIC)
+                    .addParameter(delegateType, FIELD_DELEGATE)
+                    .addStatement("this.$N = $N", FIELD_DELEGATE, FIELD_DELEGATE)
+                    .build();
+            MethodSpec getter = MethodSpec.methodBuilder(METHOD_GETTER)
+                    .addModifiers(Modifier.PUBLIC)
+                    .returns(delegateType)
+                    .addStatement("return this.$N", FIELD_DELEGATE)
+                    .build();
+
+            builder.addMethod(setter)
+                    .addMethod(getter)
+                    .addField(delegateType, FIELD_DELEGATE, Modifier.PRIVATE);
+        }
+        return builder;
     }
 
     @Override

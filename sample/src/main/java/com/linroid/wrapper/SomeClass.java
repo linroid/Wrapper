@@ -1,21 +1,23 @@
 package com.linroid.wrapper;
 
-import android.content.pm.ApplicationInfo;
 import android.support.annotation.UiThread;
-import android.view.View;
 
 import com.linroid.wrapper.annotations.Multiple;
 import com.linroid.wrapper.annotations.WrapperClass;
 
 /**
  * @author linroid <linroid@gmail.com>
- * @since 10/03/2017
+ * @since 16/03/2017
  */
 @WrapperClass
 @Multiple
-public interface SomeListener {
+public class SomeClass {
     @UiThread
-    void onClick(View view);
+    void play() {
+        System.out.println("test");
+    }
 
-    boolean onLongClick(View view, ApplicationInfo info);
+    void pause() {
+
+    }
 }
