@@ -4,6 +4,7 @@ import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
 import com.linroid.wrapper.annotations.Multiple;
 import com.linroid.wrapper.annotations.WrapperClass;
+import com.linroid.wrapper.annotations.WrapperGenerator;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
@@ -26,13 +27,17 @@ import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
@@ -74,15 +79,49 @@ public class WrapperProcessor extends AbstractProcessor {
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
         logger.printMessage(Diagnostic.Kind.NOTE, "start process wrapper annotations...");
         for (Element element : env.getElementsAnnotatedWith(WrapperClass.class)) {
+            TypeElement typeElement = (TypeElement) element;
             if (!SuperficialValidation.validateElement(element)) continue;
             try {
                 logger.printMessage(Diagnostic.Kind.NOTE, "found: " + element.toString());
                 boolean isInterface = element.getKind() == ElementKind.INTERFACE;
-
-                process(element, isInterface, false);
                 boolean isMultiple = element.getAnnotation(Multiple.class) != null;
+                boolean isAllUiThread = isAnnotatedUiThread(element);
+
+                process(typeElement, isInterface, isAllUiThread, false);
                 if (isMultiple) {
-                    process(element, isInterface, true);
+                    process(typeElement, isInterface, isAllUiThread, true);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        for (Element generatorElement : env.getElementsAnnotatedWith(WrapperGenerator.class)) {
+            if (!SuperficialValidation.validateElement(generatorElement)) continue;
+            try {
+                if (generatorElement.getKind() == ElementKind.CLASS) {
+                    TypeElement typeElement = (TypeElement) generatorElement;
+                    WrapperGenerator annotation = typeElement.getAnnotation(WrapperGenerator.class);
+                    boolean isAllUiThread = isAnnotatedUiThread(generatorElement);
+                    boolean isMultiple = generatorElement.getAnnotation(Multiple.class) != null;
+
+                    try {
+                        Class<?>[] values = annotation.values();
+                        for (Class<?> clazz : values) {
+
+                        }
+                    } catch (MirroredTypesException mte) {
+                        List<? extends TypeMirror> types = mte.getTypeMirrors();
+                        for (TypeMirror tm : types) {
+                            DeclaredType classTypeMirror = (DeclaredType) tm;
+                            TypeElement classTypeElement = (TypeElement) classTypeMirror.asElement();
+                            boolean isInterface = classTypeElement.getKind() == ElementKind.INTERFACE;
+                            process(classTypeElement, isInterface, isAllUiThread, false);
+                            if (isMultiple) {
+                                process(classTypeElement, isInterface, isAllUiThread, true);
+                            }
+                        }
+                    }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -91,12 +130,9 @@ public class WrapperProcessor extends AbstractProcessor {
         return false;
     }
 
-    private void process(Element element, boolean isInterface, boolean isMultiple) {
-        TypeElement typeElement = (TypeElement) element;
-
-        String qualifyName = typeElement.getQualifiedName().toString();
-        String packageName = qualifyName.substring(0, qualifyName.lastIndexOf('.'));
-        boolean isAllUiThread = isAnnotatedUiThread(typeElement);
+    private void process(TypeElement typeElement, boolean isInterface, boolean isAllUiThread, boolean isMultiple) {
+        PackageElement packageElement = elementUtils.getPackageOf(typeElement);
+        String packageName = packageElement.getQualifiedName().toString();
         boolean hasUiThread = isAllUiThread;
         TypeName delegateType = TypeName.get(typeElement.asType());
         TypeSpec.Builder typeBuilder = createNewWrapper(typeElement, delegateType, isInterface, isMultiple);
@@ -199,6 +235,9 @@ public class WrapperProcessor extends AbstractProcessor {
 
         if (hasReturnType) {
             methodBuilder.addStatement("return $N", defaultValue(methodElement.getReturnType()));
+        }
+        for (TypeMirror thrownType : methodElement.getThrownTypes()) {
+            methodBuilder.addException(TypeName.get(thrownType));
         }
         return methodBuilder.build();
     }
@@ -306,8 +345,13 @@ public class WrapperProcessor extends AbstractProcessor {
         Set<Class<? extends Annotation>> annotations = new LinkedHashSet<>();
 
         annotations.add(WrapperClass.class);
+        annotations.add(WrapperGenerator.class);
 
         return annotations;
     }
 
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latestSupported();
+    }
 }
