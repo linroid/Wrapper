@@ -50,17 +50,17 @@ import javax.tools.Diagnostic;
  */
 @AutoService(Processor.class)
 public class WrapperProcessor extends AbstractProcessor {
-    public static final String FIELD_DELEGATE = "_delegate";
-    public static final String FIELD_MULTI_DELEGATE = "_delegates";
-    public static final String FIELD_HANDLER = "_handler";
-    public static final String METHOD_SETTER = "setWrapper";
-    public static final String METHOD_GETTER = "getWrapper";
-    public static final String METHOD_ADDER = "addWrapper";
-    public static final String METHOD_REMOVER = "removeWrapper";
+    private static final String FIELD_DELEGATE = "_delegate";
+    private static final String FIELD_MULTI_DELEGATE = "_delegates";
+    private static final String FIELD_HANDLER = "_handler";
+    private static final String METHOD_SETTER = "setWrapper";
+    private static final String METHOD_GETTER = "getWrapper";
+    private static final String METHOD_ADDER = "addWrapper";
+    private static final String METHOD_REMOVER = "removeWrapper";
 
-    public static final ClassName HANDLER_CLASS_NAME = ClassName.get("android.os", "Handler");
-    public static final ClassName LOOPER_CLASS_NAME = ClassName.get("android.os", "Looper");
-    public static final ClassName HASH_SET_CLASS_NAME = ClassName.get(HashSet.class);
+    private static final ClassName HANDLER_CLASS_NAME = ClassName.get("android.os", "Handler");
+    private static final ClassName LOOPER_CLASS_NAME = ClassName.get("android.os", "Looper");
+    private static final ClassName HASH_SET_CLASS_NAME = ClassName.get(HashSet.class);
     private Messager logger;
     private Types typeUtils;
     private Elements elementUtils;
