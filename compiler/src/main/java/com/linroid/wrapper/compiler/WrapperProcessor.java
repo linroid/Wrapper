@@ -2,9 +2,9 @@ package com.linroid.wrapper.compiler;
 
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
-import com.linroid.wrapper.annotations.WrapperMultiple;
 import com.linroid.wrapper.annotations.WrapperClass;
 import com.linroid.wrapper.annotations.WrapperGenerator;
+import com.linroid.wrapper.annotations.WrapperMultiple;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
@@ -136,20 +136,20 @@ public class WrapperProcessor extends AbstractProcessor {
         boolean hasUiThread = isAllUiThread;
         TypeName delegateType = TypeName.get(typeElement.asType());
         TypeSpec.Builder typeBuilder = createNewWrapper(typeElement, delegateType, isInterface, isMultiple);
-        for (Element e : typeElement.getEnclosedElements()) { // iterate over children
-            if (e.getKind() == ElementKind.METHOD) {
-                boolean isMethodUiThread = isAllUiThread;
-                ExecutableElement methodElement = (ExecutableElement) e;
-                if (!isMethodUiThread) {
-                    isMethodUiThread = isAnnotatedUiThread(methodElement);
-                } else {
-                    // TODO: 10/03/2017 是否在Method 和 Type 都注解了 UiThread 的时候 抛出异常?
-                }
-                if (isMethodUiThread) {
-                    hasUiThread = true;
-                }
-                typeBuilder.addMethod(createDelegateMethod(typeElement, methodElement, isInterface, isMethodUiThread, isMultiple));
+        Set<ExecutableElement> methodElements = new HashSet<>();
+        findAllMethods(typeElement, methodElements);
+
+        for (ExecutableElement methodElement : methodElements) {
+            boolean isMethodUiThread = isAllUiThread;
+            if (!isMethodUiThread) {
+                isMethodUiThread = isAnnotatedUiThread(methodElement);
+            } else {
+                // TODO: 10/03/2017 是否在Method 和 Type 都注解了 UiThread 的时候 抛出异常?
             }
+            if (isMethodUiThread) {
+                hasUiThread = true;
+            }
+            typeBuilder.addMethod(createDelegateMethod(typeElement, methodElement, isInterface, isMethodUiThread, isMultiple));
         }
         if (hasUiThread) {
             typeBuilder.addField(HANDLER_CLASS_NAME, FIELD_HANDLER, Modifier.PRIVATE);
@@ -163,6 +163,7 @@ public class WrapperProcessor extends AbstractProcessor {
         if (hasUiThread) {
             constructorBuilder.addStatement("this.$N = new $T($T.getMainLooper())", FIELD_HANDLER, HANDLER_CLASS_NAME, LOOPER_CLASS_NAME);
         }
+
         typeBuilder.addMethod(constructorBuilder.build());
         if (hasUiThread) {
             MethodSpec.Builder secondConstructorBuilder = MethodSpec.constructorBuilder()
@@ -186,6 +187,43 @@ public class WrapperProcessor extends AbstractProcessor {
             javaFile.writeTo(filer);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+
+    }
+
+    private void findAllMethods(TypeElement typeElement, Set<ExecutableElement> elementsSet) {
+        boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
+
+        // interfaces
+        for (TypeMirror typeMirror : typeElement.getInterfaces()) {
+            if (typeMirror instanceof DeclaredType) {
+                DeclaredType declaredType = (DeclaredType) typeMirror;
+                TypeElement interfaceElement = (TypeElement) declaredType.asElement();
+                findAllMethods(interfaceElement, elementsSet);
+            }
+        }
+
+        // super class
+        TypeMirror superTypeMirror = typeElement.getSuperclass();
+        if (superTypeMirror.getKind() != TypeKind.NONE) {
+            DeclaredType declaredType = (DeclaredType) superTypeMirror;
+            TypeElement superElement = (TypeElement) declaredType.asElement();
+            if (!superElement.getQualifiedName().toString().equals("java.lang.Object")) {
+                findAllMethods(superElement, elementsSet);
+            }
+        }
+
+
+        for (Element e : typeElement.getEnclosedElements()) { // iterate over children
+            if (e.getKind() == ElementKind.METHOD) {
+                ExecutableElement methodElement = (ExecutableElement) e;
+                Set<Modifier> modifiers = methodElement.getModifiers();
+                if (modifiers.contains(Modifier.PRIVATE)
+                        || (modifiers.contains(Modifier.PROTECTED) && !isInterface)) {
+                    continue;
+                }
+                elementsSet.add(methodElement);
+            }
         }
 
     }
@@ -218,7 +256,19 @@ public class WrapperProcessor extends AbstractProcessor {
             MethodSpec.Builder runMethodBuilder = MethodSpec.methodBuilder("run")
                     .addAnnotation(Override.class)
                     .addModifiers(Modifier.PUBLIC);
+            List<? extends TypeMirror> throwTypes = methodElement.getThrownTypes();
+            if (throwTypes.size() > 0) {
+                runMethodBuilder.beginControlFlow("try");
+            }
             invokeMethod(element, runMethodBuilder, methodName, argNames, isMultiple, isUiThread, hasReturnType);
+            if (throwTypes.size() > 0) {
+                for (TypeMirror exception : throwTypes) {
+                    runMethodBuilder.nextControlFlow("catch ($T error)", TypeName.get(exception));
+                    runMethodBuilder.addStatement("error.printStackTrace()");
+                }
+                runMethodBuilder.endControlFlow();
+            }
+
             TypeSpec runnable = TypeSpec.anonymousClassBuilder("")
                     .addSuperinterface(Runnable.class)
                     .addMethod(runMethodBuilder.build())
@@ -291,7 +341,7 @@ public class WrapperProcessor extends AbstractProcessor {
 
 
         TypeSpec.Builder builder = TypeSpec.classBuilder(wrapperClassName)
-                .addModifiers(Modifier.PUBLIC, Modifier.FINAL);
+                .addModifiers(Modifier.PUBLIC);
         if (isInterface) {
             builder.addSuperinterface(delegateType);
         }
