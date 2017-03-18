@@ -2,7 +2,7 @@ package com.linroid.wrapper.compiler;
 
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
-import com.linroid.wrapper.annotations.Multiple;
+import com.linroid.wrapper.annotations.WrapperMultiple;
 import com.linroid.wrapper.annotations.WrapperClass;
 import com.linroid.wrapper.annotations.WrapperGenerator;
 import com.squareup.javapoet.ClassName;
@@ -84,7 +84,7 @@ public class WrapperProcessor extends AbstractProcessor {
             try {
                 logger.printMessage(Diagnostic.Kind.NOTE, "found: " + element.toString());
                 boolean isInterface = element.getKind() == ElementKind.INTERFACE;
-                boolean isMultiple = element.getAnnotation(Multiple.class) != null;
+                boolean isMultiple = element.getAnnotation(WrapperMultiple.class) != null;
                 boolean isAllUiThread = isAnnotatedUiThread(element);
 
                 process(typeElement, isInterface, isAllUiThread, false);
@@ -103,7 +103,7 @@ public class WrapperProcessor extends AbstractProcessor {
                     TypeElement typeElement = (TypeElement) generatorElement;
                     WrapperGenerator annotation = typeElement.getAnnotation(WrapperGenerator.class);
                     boolean isAllUiThread = isAnnotatedUiThread(generatorElement);
-                    boolean isMultiple = generatorElement.getAnnotation(Multiple.class) != null;
+                    boolean isMultiple = generatorElement.getAnnotation(WrapperMultiple.class) != null;
 
                     try {
                         Class<?>[] values = annotation.values();

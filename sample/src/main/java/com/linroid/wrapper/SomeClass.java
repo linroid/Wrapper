@@ -2,7 +2,7 @@ package com.linroid.wrapper;
 
 import android.support.annotation.UiThread;
 
-import com.linroid.wrapper.annotations.Multiple;
+import com.linroid.wrapper.annotations.WrapperMultiple;
 import com.linroid.wrapper.annotations.WrapperClass;
 
 /**
@@ -10,7 +10,7 @@ import com.linroid.wrapper.annotations.WrapperClass;
  * @since 16/03/2017
  */
 @WrapperClass
-@Multiple
+@WrapperMultiple
 public class SomeClass {
     @UiThread
     void play() {

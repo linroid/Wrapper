@@ -14,5 +14,5 @@ import static java.lang.annotation.RetentionPolicy.CLASS;
 @Documented
 @Retention(CLASS)
 @Target({TYPE})
-public @interface Multiple {
+public @interface WrapperMultiple {
 }

@@ -4,8 +4,8 @@ import android.support.annotation.UiThread;
 import android.view.MenuItem;
 import android.view.View;
 
-import com.linroid.wrapper.annotations.Multiple;
 import com.linroid.wrapper.annotations.WrapperGenerator;
+import com.linroid.wrapper.annotations.WrapperMultiple;
 
 /**
  * @author linroid <linroid@gmail.com>
@@ -15,10 +15,11 @@ import com.linroid.wrapper.annotations.WrapperGenerator;
         values = {
                 View.OnClickListener.class,
                 View.OnLongClickListener.class,
-                MenuItem.OnMenuItemClickListener.class
+                MenuItem.OnMenuItemClickListener.class,
+                View.OnScrollChangeListener.class
         }
 )
 @UiThread
-@Multiple
+@WrapperMultiple
 public class SomeGenerator {
 }

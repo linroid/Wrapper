@@ -4,7 +4,7 @@ import android.content.pm.ApplicationInfo;
 import android.support.annotation.UiThread;
 import android.view.View;
 
-import com.linroid.wrapper.annotations.Multiple;
+import com.linroid.wrapper.annotations.WrapperMultiple;
 import com.linroid.wrapper.annotations.WrapperClass;
 
 /**
@@ -12,7 +12,7 @@ import com.linroid.wrapper.annotations.WrapperClass;
  * @since 10/03/2017
  */
 @WrapperClass
-@Multiple
+@WrapperMultiple
 public interface SomeListener {
     @UiThread
     void onClick(View view);
