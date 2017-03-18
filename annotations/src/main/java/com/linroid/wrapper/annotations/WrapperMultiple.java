@@ -8,6 +8,8 @@ import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.CLASS;
 
 /**
+ * Wrapper 支持添加多个
+ *
  * @author linroid <linroid@gmail.com>
  * @since 16/03/2017
  */
