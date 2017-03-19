@@ -1,11 +1,10 @@
 package com.linroid.wrapper;
 
-import android.content.pm.ApplicationInfo;
 import android.support.annotation.UiThread;
 import android.view.View;
 
-import com.linroid.wrapper.annotations.WrapperMultiple;
 import com.linroid.wrapper.annotations.WrapperClass;
+import com.linroid.wrapper.annotations.WrapperMultiple;
 
 /**
  * @author linroid <linroid@gmail.com>
@@ -15,7 +14,7 @@ import com.linroid.wrapper.annotations.WrapperClass;
 @WrapperMultiple
 public interface SomeListener {
     @UiThread
-    void onClick(View view);
+    void onFoo(View view);
 
-    boolean onLongClick(View view, ApplicationInfo info);
+    boolean onUserLeave();
 }
