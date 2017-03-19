@@ -83,6 +83,10 @@ multiWrapper.addWrapper(listener); // 添加 listener
 multiWrapper.onFoo(view); // 调用方法
 ```
 
+# TODO
+
+ - 将 `Foo.instance().method()` 调用变为 `Foo.method()`
+
 ## License
 Copyright 2017 linroid
 
