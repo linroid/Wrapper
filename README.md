@@ -1,5 +1,8 @@
 # Wrapper
 Wrapper 通过自动生成一些代码，让你更愉快地调用 Listener
+
+[博客介绍](http://linroid.com/2017/03/19/introduce-wrapper/)
+
 ## 引入
 在你的 `build.gradle`：
 ```groovy
