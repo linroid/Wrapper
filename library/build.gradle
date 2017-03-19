@@ -92,8 +92,8 @@ Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
 
 bintray {
-    user = properties.getProperty("bintray.user", "linroid")
-    key = properties.getProperty("bintray.apikey", "9e7c5147271cef3b289cdbc4300d42d06fafc102")
+    user = properties.getProperty("bintray.user")
+    key = properties.getProperty("bintray.apikey")
     configurations = ['archives']
     pkg {
         repo = "maven"
