@@ -273,10 +273,9 @@ public class WrapperProcessor extends AbstractProcessor {
                     .addSuperinterface(Runnable.class)
                     .addMethod(runMethodBuilder.build())
                     .build();
-            methodBuilder.beginControlFlow("if($T.myLooper() == null || $T.myLooper() != $T.getMainLooper())", LOOPER_CLASS_NAME, LOOPER_CLASS_NAME, LOOPER_CLASS_NAME);
+            methodBuilder.beginControlFlow("if($T.myLooper() == null || $T.myLooper() != $N.getLooper())", LOOPER_CLASS_NAME, LOOPER_CLASS_NAME, FIELD_HANDLER);
             methodBuilder.addStatement("$N.post($L)", FIELD_HANDLER, runnable);
-            methodBuilder.endControlFlow();
-            methodBuilder.beginControlFlow("else");
+            methodBuilder.nextControlFlow("else");
         }
         invokeMethod(element, methodBuilder, methodName, argNames, isMultiple, isUiThread, hasReturnType);
         if (isUiThread) {
@@ -347,14 +346,19 @@ public class WrapperProcessor extends AbstractProcessor {
         }
         if (isMultiple) {
             MethodSpec adder = MethodSpec.methodBuilder(METHOD_ADDER)
-                    .addModifiers(Modifier.PUBLIC)
+                    .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                     .addParameter(delegateType, FIELD_DELEGATE)
-                    .addStatement("this.$N.add($N)", FIELD_MULTI_DELEGATE, FIELD_DELEGATE)
+                    .beginControlFlow("if ($N != null)", FIELD_DELEGATE)
+                    .addStatement("return this.$N.add($N)", FIELD_MULTI_DELEGATE, FIELD_DELEGATE)
+                    .endControlFlow()
+                    .addStatement("return false")
+                    .returns(TypeName.BOOLEAN)
                     .build();
             MethodSpec remover = MethodSpec.methodBuilder(METHOD_REMOVER)
-                    .addModifiers(Modifier.PUBLIC)
+                    .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                     .addParameter(delegateType, FIELD_DELEGATE)
-                    .addStatement("this.$N.remove($N)", FIELD_MULTI_DELEGATE, FIELD_DELEGATE)
+                    .addStatement("return this.$N.remove($N)", FIELD_MULTI_DELEGATE, FIELD_DELEGATE)
+                    .returns(TypeName.BOOLEAN)
                     .build();
             TypeName hashSetType = ParameterizedTypeName.get(HASH_SET_CLASS_NAME, delegateType);
             FieldSpec holders = FieldSpec.builder(hashSetType, FIELD_MULTI_DELEGATE, Modifier.PRIVATE)
@@ -365,12 +369,12 @@ public class WrapperProcessor extends AbstractProcessor {
                     .addField(holders);
         } else {
             MethodSpec setter = MethodSpec.methodBuilder(METHOD_SETTER)
-                    .addModifiers(Modifier.PUBLIC)
+                    .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                     .addParameter(delegateType, FIELD_DELEGATE)
                     .addStatement("this.$N = $N", FIELD_DELEGATE, FIELD_DELEGATE)
                     .build();
             MethodSpec getter = MethodSpec.methodBuilder(METHOD_GETTER)
-                    .addModifiers(Modifier.PUBLIC)
+                    .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                     .returns(delegateType)
                     .addStatement("return this.$N", FIELD_DELEGATE)
                     .build();
