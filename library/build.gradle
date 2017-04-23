@@ -33,7 +33,8 @@ dependencies {
     })
 //    compile 'com.android.support:appcompat-v7:25.2.0'
     testCompile 'junit:junit:4.12'
-    compile project(':annotations')
+//    compile project(':annotations')
+    compile 'com.linroid.wrapper:annotations:0.1.0'
 }
 
 
@@ -93,11 +94,11 @@ properties.load(project.rootProject.file('local.properties').newDataInputStream(
 
 bintray {
     user = properties.getProperty("bintray.user")
-    key = properties.getProperty("bintray.apikey")
+    key = properties.getProperty("bintray.apiKey")
     configurations = ['archives']
     pkg {
         repo = "maven"
-        name = "compiler"
+        name = "library"
         websiteUrl = siteUrl
         vcsUrl = gitUrl
         licenses = ["Apache-2.0"]

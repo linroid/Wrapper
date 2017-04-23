@@ -1,8 +1,96 @@
 apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'signing'
+apply plugin: 'com.jfrog.bintray'
 
 sourceCompatibility = rootProject.ext.sourceCompatibilityVersion
 targetCompatibility = rootProject.ext.targetCompatibilityVersion
 
 dependencies {
     compile fileTree(include: ['*.jar'], dir: 'libs')
+}
+
+group = rootProject.ext.wrapperGroup
+version = rootProject.ext.wrapperVersion
+def siteUrl = rootProject.ext.siteUrl
+def gitUrl = rootProject.ext.gitUrl
+
+sourceCompatibility = rootProject.ext.sourceCompatibilityVersion
+targetCompatibility = rootProject.ext.targetCompatibilityVersion
+
+install {
+    repositories.mavenInstaller {
+        pom {
+            project {
+                packaging 'jar'
+                name 'Wrapper compiler'
+                url siteUrl
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id 'linroid'
+                        name 'linroid'
+                        email 'linorid@gmail.com'
+                    }
+                }
+                scm {
+                    connection gitUrl
+                    developerConnection gitUrl
+                    url siteUrl
+                }
+            }
+        }
+    }
+}
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+        resources {
+            srcDir 'res'
+        }
+    }
+}
+
+javadoc {
+    title = "Wrapper ${version} API"
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from 'build/docs/javadoc'
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+artifacts {
+    archives jar
+    archives javadocJar
+    archives sourcesJar
+}
+
+
+Properties properties = new Properties()
+properties.load(project.rootProject.file('local.properties').newDataInputStream())
+bintray {
+    user = properties.getProperty("bintray.user")
+    key = properties.getProperty("bintray.apiKey")
+    configurations = ['archives']
+    pkg {
+        repo = "maven"
+        name = "annotations"
+        websiteUrl = siteUrl
+        vcsUrl = gitUrl
+        licenses = ["Apache-2.0"]
+        publish = true
+    }
 }

@@ -3,7 +3,7 @@ package com.linroid.wrapper.compiler;
 import java.util.List;
 
 /**
- * @author linroid <linroid@gmail.com>
+ * @author linroid
  * @since 10/03/2017
  */
 class Utils {

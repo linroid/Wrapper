@@ -7,8 +7,8 @@ Wrapper 通过自动生成一些代码，让你更愉快地调用 Listener
 在你的 `build.gradle`：
 ```groovy
 dependencies {
-    annotationProcessor 'com.linroid.wrapper:compiler:0.0.1'
-    compile 'com.linroid.wrapper:library:0.0.1'
+    annotationProcessor 'com.linroid.wrapper:compiler:0.1.0'
+    compile 'com.linroid.wrapper:library:0.1.0'
 }
 ```
 

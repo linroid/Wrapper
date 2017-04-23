@@ -9,7 +9,7 @@ import static java.lang.annotation.RetentionPolicy.CLASS;
 
 /**
  * 指定这个类需要被 Wrapper 处理
- * @author linroid <linroid@gmail.com>
+ * @author linroid
  * @since 10/03/2017
  */
 @Documented

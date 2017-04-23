@@ -1,8 +1,4 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
-
-group = "com.linroid.wrapper"
-version = "0.0.1"
-
 buildscript {
     repositories {
         jcenter()
@@ -27,7 +23,7 @@ ext {
     sourceCompatibilityVersion = JavaVersion.VERSION_1_7
     targetCompatibilityVersion = JavaVersion.VERSION_1_7
 
-    wrapperVersion = '0.0.1'
+    wrapperVersion = '0.1.0'
     wrapperGroup = 'com.linroid.wrapper'
     siteUrl = 'https://github.com/linorid/Wrapper'
     gitUrl = 'https://github.com/linroid/Wrapper.git'

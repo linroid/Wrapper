@@ -1,5 +1,6 @@
 apply plugin: 'java'
-apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'maven'
+apply plugin: 'signing'
 apply plugin: 'com.jfrog.bintray'
 
 dependencies {
@@ -8,7 +9,7 @@ dependencies {
     compile 'com.google.auto.service:auto-service:1.0-rc3'
     compile 'com.google.auto:auto-common:0.8'
     compile 'com.github.javaparser:javaparser-core:3.1.1'
-    compile project(':annotations')
+    compile 'com.linroid.wrapper:annotations:0.1.0'
 }
 
 group = rootProject.ext.wrapperGroup
@@ -23,7 +24,7 @@ install {
     repositories.mavenInstaller {
         pom {
             project {
-                packaging 'aar'
+                packaging 'jar'
                 name 'Wrapper compiler'
                 url siteUrl
                 licenses {
@@ -48,9 +49,38 @@ install {
         }
     }
 }
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+        resources {
+            srcDir 'res'
+        }
+    }
+}
+
+javadoc {
+    title = "Wrapper ${version} API"
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from 'build/docs/javadoc'
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
 
 artifacts {
+    archives jar
+    archives javadocJar
+    archives sourcesJar
 }
+
+
 Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
 bintray {

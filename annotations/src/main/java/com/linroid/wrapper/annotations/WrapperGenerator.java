@@ -9,7 +9,7 @@ import static java.lang.annotation.RetentionPolicy.CLASS;
 
 /**
  * 可以处理多个类，或者用来处理已经存在无法修改的类/接口(比如 Android SDK 中的)
- * @author linroid <linroid@gmail.com>
+ * @author linroid
  * @since 16/03/2017
  */
 @Documented

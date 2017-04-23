@@ -45,7 +45,7 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
 /**
- * @author linroid <linroid@gmail.com>
+ * @author linroid
  * @since 10/03/2017
  */
 @AutoService(Processor.class)
@@ -243,9 +243,9 @@ public class WrapperProcessor extends AbstractProcessor {
         if (hasReturnType) {
             methodBuilder.returns(TypeName.get(methodElement.getReturnType()));
         }
-        if (isInterface) {
+//        if (isInterface) {
             methodBuilder.addModifiers(Modifier.PUBLIC);
-        }
+//        }
         List<? extends VariableElement> params = methodElement.getParameters();
         List<String> argNames = new ArrayList<>(params.size());
         for (VariableElement param : params) {
